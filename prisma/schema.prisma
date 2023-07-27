@@ -8,20 +8,35 @@ datasource db {
     relationMode = "prisma"
 }
 
-model hackCertificationUser {
-    id    Int     @id @default(autoincrement())
-    userId String @unique
-    userName String
-    userLocale String
+model ticket {
+    id    Int     @id @default(autoincrement()) @unique
+    createdAt DateTime @default(now())
+    guildId String?
+    userId String?
+    channelId String?
+    ticketType TicketType @default(Open)
+    orderType OrderType?
+    embedMessageId String?
+    accountPlatform String?
+    accountEmail String?
+    accountPassword String?
+    accountLevel String?
 }
 
-model User {
-    id Int @id @default(autoincrement())
-    name String @unique
-    username String
-    createdAt DateTime @default(now())
-    money BigInt @default(0)
-    betWin Int @default(0)
-    betFailed Int @default(0)
-    lastDaily String @default("")
+enum TicketType {
+    Open
+    Close
+    Delete
+}
+
+enum OrderType {
+    Set_5000
+    Set_10000
+    Set_20000
+    Set_30000
+    Set_50000
+    Only_3Money
+    Only_office
+    Only_level
+    Only_unlock
 }
