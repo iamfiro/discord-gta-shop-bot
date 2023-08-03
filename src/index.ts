@@ -3,13 +3,15 @@ import ping from './commands/ping';
 import { Routes } from 'discord.js';
 import buyLog from './commands/buyLog';
 import setup from './commands/tickets/ticket-setup';
+import ticketDelete from './commands/tickets/ticket-delete';
 
 client.on('ready', async() => {
     await rest.put(Routes.applicationCommands(process.env.BOT_ID), {
         body: [
             ping.info.toJSON(), 
             buyLog.info.toJSON(),
-            setup.info.toJSON()
+            setup.info.toJSON(),
+            ticketDelete.info.toJSON()
         ]
     })
     console.log(`✅ Logged in as ${client.user?.tag}!`)
@@ -21,6 +23,7 @@ client.on('interactionCreate', async interaction => {
             case 'ping': ping.handler(interaction); break;
             case '구매로그등록': buyLog.handler(interaction); break;
             case '티켓': setup.handler(interaction); break;
+            case '닫기': ticketDelete.handler(interaction); break;
         }
     }
 })

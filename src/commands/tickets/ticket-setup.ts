@@ -1,6 +1,6 @@
-import { ActionRowBuilder, AnyComponentBuilder, ButtonBuilder, ButtonStyle, ChannelType, ChatInputCommandInteraction, ComponentType, EmbedBuilder, Events, ModalActionRowComponentBuilder, ModalBuilder, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, channelMention, userMention } from "discord.js";
+import { ActionRowBuilder, AnyComponentBuilder, ButtonBuilder, ButtonStyle, ChannelType, ChatInputCommandInteraction, ComponentType, EmbedBuilder, Events, ModalActionRowComponentBuilder, ModalBuilder, PermissionsBitField, SlashCommandBuilder, StringSelectMenuBuilder, TextChannel, TextInputBuilder, TextInputStyle, channelMention, userMention } from "discord.js";
 import { client } from "../../lib/bot";
-import { addTicket, checkTicketDuplicate, editTicketData, editTicketMessageIdAndChannelId } from "../../db/ticket";
+import { addTicket, checkTicketDuplicate, editTicketData, editTicketMessageIdAndChannelId, editTicketTypeToClose, getTicketData } from "../../db/ticket";
 import { OrderType } from "@prisma/client";
 import { onlyNumberRegex } from "../../lib/regex";
 
@@ -37,6 +37,13 @@ export default {
     info: new SlashCommandBuilder().setName("티켓").setDescription("Replies with Pong!"),
     handler
 }
+
+const sleep = async (milliseconds) => {
+    await new Promise(resolve => {
+        return setTimeout(resolve, milliseconds)
+    });
+};
+
 
 client.on(Events.InteractionCreate, async interaction => {
     if(interaction.isButton()) {
@@ -140,68 +147,17 @@ client.on(Events.InteractionCreate, async interaction => {
                             .setDescription(`\`\`\`\n1️⃣ 선택하신 패키지\n> ${orderTypeToName(interaction.values[0])}\n\n2️⃣ 계정 플랫폼(ex Steam. Rockstar Launcher)\n> [비어 있음]\n\n3️⃣ 계정 이메일 혹은 아이디\n> [비어 있음]\n\n4️⃣ 계정 비밀번호\n> [비어 있음]\n\n5️⃣ 원하는 레벨(1 ~ 8000) 세트 메뉴 혹은 레벨 단품에만 해당\n> [비어 있음]\`\`\`\n패키지 수정시 티켓 닫지 말고 여기다 적어주세요`)
 
                         const editdataButton = new ButtonBuilder()
-                            .setLabel('✏️ 정보 수정하기 (최초 1회)')
+                            .setLabel('✏️ 정보 수정하기')
                             .setStyle(ButtonStyle.Secondary)
                             .setCustomId('buttonEditTicketData')
+                        const deleteTicketButton = new ButtonBuilder()
+                            .setLabel("티켓 삭제하기")
+                            .setStyle(ButtonStyle.Danger)
+                            .setCustomId("buttonDeleteTicket")
                         const buttonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(editdataButton);
-                        return await r.send({ embeds: [channelEmbed], components: [buttonRow] }).then(sent => {
+                        const buttonRows = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteTicketButton);
+                        return await r.send({ embeds: [channelEmbed], components: [buttonRow, buttonRows] }).then(sent => {
                             editTicketMessageIdAndChannelId(interaction, sent.id, r.id)
-
-                            const collector = sent.createMessageComponentCollector({
-                                componentType: ComponentType.Button,
-                            });
-
-                            collector.on('collect', async (interaction) => {
-                                if(interaction.customId === 'buttonEditTicketData') {
-                                    const TicketSendModal = new ModalBuilder()
-                                        .setTitle('📩 티켓 생성')
-                                        .setCustomId(`ticketSendEmbed-${interaction.user.id}`)
-                                    const AccountType = new TextInputBuilder({
-                                        custom_id: 'ticketAccountPlatform',
-                                        label: '계정 플랫폼(ex Steam. Rockstar Launcher)',
-                                        style: TextInputStyle.Short,
-                                    })
-                                    const AccountEmail = new TextInputBuilder({
-                                        custom_id: 'ticketAccountEmailOrId',
-                                        label: '계정 이메일 혹은 아이디',
-                                        style: TextInputStyle.Short,
-                                    })
-                                    const AccountPassword = new TextInputBuilder({
-                                        custom_id: 'ticketAccountPassword',
-                                        label: '계정 비밀번호',
-                                        style: TextInputStyle.Short,
-                                    })
-                                    const AccountLevel = new TextInputBuilder({
-                                        custom_id: 'ticketAccountLevel',
-                                        label: '원하는 레벨(1 ~ 8000) 세트 메뉴, 레벨 단품에만 해당',
-                                        style: TextInputStyle.Short
-                                    })
-                                    const firstActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountType)
-                                    const secondActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountEmail)
-                                    const thirdActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountPassword)
-                                    const fourthActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountLevel)
-                        
-                                    TicketSendModal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
-                                    await interaction.showModal(TicketSendModal);
-
-                                    const filter = (interaction) => interaction.customId === `ticketSendEmbed-${interaction.user.id}`;
-
-                                    interaction
-                                        .awaitModalSubmit({ filter, time: 30_000 })
-                                        .then(async (mi) => {
-                                            const accountPlatform = mi.fields.getTextInputValue('ticketAccountPlatform'); 
-                                            const accountEmail = mi.fields.getTextInputValue('ticketAccountEmailOrId'); 
-                                            const accountPassword = mi.fields.getTextInputValue('ticketAccountPassword'); 
-                                            const accountLevel = onlyNumberRegex.test(mi.fields.getTextInputValue('ticketAccountLevel')) ? mi.fields.getTextInputValue('ticketAccountLevel') : 0;
-                                            const datas = await editTicketData(mi, { accountPlatform, accountEmail, accountPassword, accountLevel: accountLevel });
-                                            const editChannelEmbed = new EmbedBuilder()
-                                                .setColor(0x7F8C8D)
-                                                .setTitle(r.name)
-                                                .setDescription(`\`\`\`\n1️⃣ 선택하신 패키지\n> ${orderTypeToName(datas.data.orderType)}\n\n2️⃣ 계정 플랫폼(ex Steam. Rockstar Launcher)\n> ${accountPlatform}\n\n3️⃣ 계정 이메일 혹은 아이디\n> ${accountEmail}\n\n4️⃣ 계정 비밀번호\n> ${accountPassword}\n\n5️⃣ 원하는 레벨(1 ~ 8000) 세트 메뉴 혹은 레벨 단품에만 해당\n> ${datas.level}\`\`\`\n패키지 수정시 티켓 닫지 말고 여기다 적어주세요`)
-                                            sent.edit({embeds: [editChannelEmbed], components: []});
-                                        })
-                                }
-                            })
                         })
                     });
                 })
@@ -210,7 +166,6 @@ client.on(Events.InteractionCreate, async interaction => {
                     .setColor(0x7F8C8D)
                     .setTitle("❌ 티켓 생성중 오류가 발생했습니다")
                     .setDescription('이미 진행 중인 티켓이 있습니다')
-                await interaction.reply({ embeds: [embed], ephemeral: true})
             }
             
         })
@@ -218,8 +173,85 @@ client.on(Events.InteractionCreate, async interaction => {
 })
 
 client.on(Events.InteractionCreate, async interaction => {
+    if(interaction.isButton()) {
+        if(interaction.customId === 'buttonDeleteTicket') {
+            const embed = new EmbedBuilder()
+                .setColor(0xED4245)
+                .setTitle("티켓을 삭제 하시겠습니까")
+                .setDescription('삭제하면 채널과 채널 메시지는 영구적으로 삭제 됩니다')
+            const deleteTicketButton = new ButtonBuilder()
+                .setLabel("티켓 삭제하기")
+                .setStyle(ButtonStyle.Danger)
+                .setCustomId("buttonDeleteTicketConfirm")
+            const buttonRows = new ActionRowBuilder<ButtonBuilder>().addComponents(deleteTicketButton);
+            await interaction.reply({ embeds: [embed], ephemeral: true, components: [buttonRows]})
+        } else if(interaction.customId === 'buttonDeleteTicketConfirm') {
+            const embed = new EmbedBuilder()
+                .setColor(0xED4245)
+                .setTitle("티켓이 10초 뒤에 삭제 됩니다")
+                .setDescription('삭제하면 채널과 채널 메시지는 영구적으로 삭제 됩니다')
+            await interaction.reply({ embeds: [embed] })
+            await sleep(10000);
+            getTicketData(interaction).then(async function(results) {
+                editTicketTypeToClose(interaction);
+                (await interaction.guild.channels.fetch(results.channelId)).delete()
+            })
+        }
+    }
+})
+
+client.on(Events.InteractionCreate, async interaction => {
+    if(interaction.isButton()) {
+        if(interaction.customId === 'buttonEditTicketData') {
+            const TicketSendModal = new ModalBuilder()
+                .setTitle('📩 티켓 생성')
+                .setCustomId(`ticketSendEmbed-${interaction.user.id}`)
+            const AccountType = new TextInputBuilder({
+                custom_id: 'ticketAccountPlatform',
+                label: '계정 플랫폼(ex Steam. Rockstar Launcher)',
+                style: TextInputStyle.Short,
+            })
+            const AccountEmail = new TextInputBuilder({
+                custom_id: 'ticketAccountEmailOrId',
+                label: '계정 이메일 혹은 아이디',
+                style: TextInputStyle.Short,
+            })
+            const AccountPassword = new TextInputBuilder({
+                custom_id: 'ticketAccountPassword',
+                label: '계정 비밀번호',
+                style: TextInputStyle.Short,
+            })
+            const AccountLevel = new TextInputBuilder({
+                custom_id: 'ticketAccountLevel',
+                label: '원하는 레벨(1 ~ 8000) 세트 메뉴, 레벨 단품에만 해당',
+                style: TextInputStyle.Short
+            })
+            const firstActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountType)
+            const secondActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountEmail)
+            const thirdActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountPassword)
+            const fourthActionRow = new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(AccountLevel)
+
+            TicketSendModal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
+            await interaction.showModal(TicketSendModal);
+        }
+    }
+})
+
+client.on(Events.InteractionCreate, async interaction => {
 	if (!interaction.isModalSubmit()) return;
 	if (interaction.customId === `ticketSendEmbed-${interaction.user.id}`) {
+        const accountPlatform = interaction.fields.getTextInputValue('ticketAccountPlatform'); 
+        const accountEmail = interaction.fields.getTextInputValue('ticketAccountEmailOrId'); 
+        const accountPassword = interaction.fields.getTextInputValue('ticketAccountPassword'); 
+        const accountLevel = onlyNumberRegex.test(interaction.fields.getTextInputValue('ticketAccountLevel')) ? interaction.fields.getTextInputValue('ticketAccountLevel') : 0;
+        const datas = await editTicketData(interaction, { accountPlatform, accountEmail, accountPassword, accountLevel: accountLevel });
+        const messageChannel = client.channels.cache.get(datas.channelId) as TextChannel;
+
+        const editChannelEmbed = new EmbedBuilder()
+            .setColor(0x7F8C8D)
+            .setTitle(messageChannel.name)
+            .setDescription(`\`\`\`\n1️⃣ 선택하신 패키지\n> ${orderTypeToName(datas.data.orderType)}\n\n2️⃣ 계정 플랫폼(ex Steam. Rockstar Launcher)\n> ${accountPlatform}\n\n3️⃣ 계정 이메일 혹은 아이디\n> ${accountEmail}\n\n4️⃣ 계정 비밀번호\n> ${accountPassword}\n\n5️⃣ 원하는 레벨(1 ~ 8000) 세트 메뉴 혹은 레벨 단품에만 해당\n> ${datas.level}\`\`\`\n패키지 수정시 티켓 닫지 말고 여기다 적어주세요`);
+        (await messageChannel.messages.fetch(datas.id)).edit({embeds: [editChannelEmbed]});
 		await interaction.reply({ content: '✅ 수정 되었습니다' });
 	}
 });

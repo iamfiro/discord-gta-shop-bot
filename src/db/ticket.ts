@@ -71,6 +71,30 @@ export const getTicketEmbedId = async (interaction: any, datas: any) => {
     return { id: data.embedMessageId, channelId: data.channelId, data, level: datas.accountLevel }
 }
 
+export const editTicketTypeToClose = async (interaction: any) => {
+    getTicketId(interaction).then(async function(result) {
+        const editMsgId = await prisma.ticket.update({
+            where: {
+                id: result,
+            },
+            data: {
+                ticketType: TicketType.Close
+            }
+        })
+    });
+}
+
+export const getTicketData = async (interaction: any) => {
+    const data = await prisma.ticket.findFirst({
+        where: {
+            userId: interaction.user.id,
+            guildId: interaction.guild.id,
+            ticketType: TicketType.Open
+        }
+    });
+    return data
+}
+
 export const editTicketData = async (interaction: ModalSubmitInteraction<CacheType>, data: any) => {
     getTicketId(interaction).then(async function(result) {
         const editMsgId = await prisma.ticket.update({
