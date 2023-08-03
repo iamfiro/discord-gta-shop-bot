@@ -243,7 +243,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const accountPlatform = interaction.fields.getTextInputValue('ticketAccountPlatform'); 
         const accountEmail = interaction.fields.getTextInputValue('ticketAccountEmailOrId'); 
         const accountPassword = interaction.fields.getTextInputValue('ticketAccountPassword'); 
-        const accountLevel = onlyNumberRegex.test(interaction.fields.getTextInputValue('ticketAccountLevel')) ? interaction.fields.getTextInputValue('ticketAccountLevel') : 0;
+        const accountLevel = onlyNumberRegex.test(interaction.fields.getTextInputValue('ticketAccountLevel')) ? interaction.fields.getTextInputValue('ticketAccountLevel') : '0';
         const datas = await editTicketData(interaction, { accountPlatform, accountEmail, accountPassword, accountLevel: accountLevel });
         const messageChannel = client.channels.cache.get(datas.channelId) as TextChannel;
 
